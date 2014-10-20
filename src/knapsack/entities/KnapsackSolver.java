@@ -4,6 +4,7 @@ import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Comparator;
 import java.util.List;
+import java.util.PriorityQueue;
 
 import filehandle.FileLoader;
 import timemeasure.CPUTiming;
@@ -21,19 +22,42 @@ class RatioComparator implements Comparator<Item> {
 	
 }
 
+class UpperBoundComparator implements Comparator<Node> {
+	
+	@Override
+	public int compare(Node n1, Node n2) {
+		if (n1.getUpperBound() < n2.getUpperBound())
+			return 1;
+		else if (n1.getUpperBound() < n2.getUpperBound())
+			return -1;
+		
+		return 0;
+	}
+}
+
 
 public class KnapsackSolver {
 
 	public static void main(String[] args) {
+		Node current, left, right;
+		PriorityQueue<Node> queue = new PriorityQueue<Node>(1, new UpperBoundComparator());
+		
+		current = new Node(0,0,0,0,4);
+		queue.add(current);
 		ItemPool itemPool = new ItemPool(4);
 		itemPool.addToPool(new Item(0, 3, 45), 0);
 		itemPool.addToPool(new Item(1, 5, 30), 1);
 		itemPool.addToPool(new Item(2, 9, 45), 2);
 		itemPool.addToPool(new Item(3, 5, 10), 3);
-		System.out.println(itemPool.toString());
 		sortItemPool(itemPool);
 		System.out.println(itemPool.toString());
-		System.out.println(getUpperBound(0, 0, 0, 16, 3, itemPool));
+		
+		while(!queue.isEmpty()) {
+			left = new Node(current.getCumPrice(), current.getCumWeight(), 
+					current.getUpperBound(), current.getLevel() + 1, current.getItemVector());
+			left.setBitInVector(current.getLevel() + 1);
+			
+		}
 		
 		/*FileLoader loader = new FileLoader();
 		List<Instance> instList = loader.loadFile();
@@ -66,7 +90,7 @@ public class KnapsackSolver {
 		int curWeight = pWeight;
 		int upperBound = pPrice;
 		
-		while ((curWeight != maxWeight) && (levelToStart < maxLevel)) {
+		while ((curWeight != maxWeight) && (levelToStart <= maxLevel)) {
 			System.out.println("cw: " + curWeight);
 			System.out.println("ub: " + upperBound);
 			if(curWeight + itemPool.getItems()[levelToStart].getWeight() <= maxWeight) {
@@ -75,9 +99,12 @@ public class KnapsackSolver {
 				levelToStart++;
 			}
 			else {
-				upperBound += (maxWeight - curWeight) * 
-				(itemPool.getItems()[levelToStart].getPrice()
-						/itemPool.getItems()[levelToStart].getWeight());
+				if (levelToStart < maxLevel) {
+					System.out.println("tu!");
+					upperBound += (maxWeight - curWeight) * 
+					(itemPool.getItems()[levelToStart].getPrice()
+							/itemPool.getItems()[levelToStart].getWeight());
+				}
 				break;
 			}
 		}
