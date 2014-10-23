@@ -28,7 +28,7 @@ class UpperBoundComparator implements Comparator<Node> {
 	public int compare(Node n1, Node n2) {
 		if (n1.getUpperBound() < n2.getUpperBound())
 			return 1;
-		else if (n1.getUpperBound() < n2.getUpperBound())
+		else if (n1.getUpperBound() > n2.getUpperBound())
 			return -1;
 		
 		return 0;
@@ -39,25 +39,16 @@ class UpperBoundComparator implements Comparator<Node> {
 public class KnapsackSolver {
 
 	public static void main(String[] args) {
-		Node current, left, right;
-		PriorityQueue<Node> queue = new PriorityQueue<Node>(1, new UpperBoundComparator());
+		FileLoader loader = new FileLoader();
+		List<Instance> instList = loader.loadFile();
 		
-		current = new Node(0,0,0,0,4);
-		queue.add(current);
-		ItemPool itemPool = new ItemPool(4);
-		itemPool.addToPool(new Item(0, 3, 45), 0);
-		itemPool.addToPool(new Item(1, 5, 30), 1);
-		itemPool.addToPool(new Item(2, 9, 45), 2);
-		itemPool.addToPool(new Item(3, 5, 10), 3);
-		sortItemPool(itemPool);
-		System.out.println(itemPool.toString());
-		
-		while(!queue.isEmpty()) {
-			left = new Node(current.getCumPrice(), current.getCumWeight(), 
-					current.getUpperBound(), current.getLevel() + 1, current.getItemVector());
-			left.setBitInVector(current.getLevel() + 1);
-			
+		long startTime = CPUTiming.getCpuTime();
+		for (Instance instance : instList) {
+			sortItemPool(instance.getItemPool());
+			solveBnB(instance);
 		}
+		long cpuTime = CPUTiming.getCpuTime() - startTime;
+		System.out.println((float)cpuTime/(float) 50);
 		
 		/*FileLoader loader = new FileLoader();
 		List<Instance> instList = loader.loadFile();
@@ -86,24 +77,80 @@ public class KnapsackSolver {
 		//System.out.println("max: " + maxRelativeError);
 	}
 	
-	private static int getUpperBound(int pWeight, int pPrice, int levelToStart, int maxWeight, int maxLevel, ItemPool itemPool) {
-		int curWeight = pWeight;
-		int upperBound = pPrice;
+	private static void solveBnB(Instance instance) {
+		Node current, left, right;
+		int newPrice, newWeight, nextWeight, bestPrice = -1;
+		double newUpperBound;
+		PriorityQueue<Node> queue = new PriorityQueue<Node>(1, new UpperBoundComparator());
 		
-		while ((curWeight != maxWeight) && (levelToStart <= maxLevel)) {
-			System.out.println("cw: " + curWeight);
-			System.out.println("ub: " + upperBound);
+		current = new Node(0,0,0,0,instance.getnSize()); // TODO upravit na automatiku
+		queue.add(current);
+		
+		while(!queue.isEmpty()) {
+			current = queue.poll();
+			nextWeight = current.getCumWeight() + instance.getItemPool().getItems()[current.getLevel()].getWeight();
+			//System.out.println("Current " + current.toString());
+			
+			if(current.getUpperBound() > bestPrice) {
+				if(nextWeight <= instance.getKnapsack().getLimit() ) {
+					newPrice = current.getCumPrice() + instance.getItemPool().getItems()[current.getLevel()].getPrice();
+					newWeight = current.getCumWeight() + instance.getItemPool().getItems()[current.getLevel()].getWeight();
+					newUpperBound = getUpperBound(current.getCumWeight(), current.getCumPrice(), 
+							current.getLevel(), instance.getKnapsack().getLimit(), 
+							instance.getnSize(), instance.getItemPool());
+					
+					left = new Node(newPrice, newWeight, newUpperBound, current.getLevel() + 1, current.getItemVector());
+					left.setBitInVector(current.getLevel());
+					//System.out.println("Left " + left.toString());
+					
+					if (left.getCumPrice() > bestPrice && left.getLevel() <= (instance.getnSize()))
+						bestPrice = left.getCumPrice();
+					
+					if (left.getUpperBound() > bestPrice && left.getLevel() <= (instance.getnSize()))
+						queue.add(left);
+				}
+				
+				newPrice = current.getCumPrice();
+				newWeight = current.getCumWeight();
+				newUpperBound = getUpperBound(current.getCumWeight(), current.getCumPrice(), 
+						current.getLevel() + 1, instance.getKnapsack().getLimit(), 
+						instance.getnSize(), instance.getItemPool());
+				
+				right = new Node(newPrice, newWeight, newUpperBound, current.getLevel() + 1, current.getItemVector());
+				//System.out.println("Right " + right.toString());
+				
+				if (right.getCumPrice() > bestPrice && right.getLevel() <= (instance.getnSize()))
+					bestPrice = right.getCumPrice();
+				
+				if (right.getUpperBound() > bestPrice && right.getLevel() <= (instance.getnSize()))
+					queue.add(right);
+			}
+			
+		}
+		
+		//System.out.println("BEST PRICE: " + bestPrice);
+		
+	}
+	
+	private static double getUpperBound(int pWeight, int pPrice, int levelToStart, int maxWeight, int maxLevel, ItemPool itemPool) {
+		int curWeight = pWeight;
+		double upperBound = pPrice;
+		
+		while ((curWeight != maxWeight) && (levelToStart < maxLevel)) {
+			//System.out.println("cw: " + curWeight);
+			//System.out.println("ub: " + upperBound);
 			if(curWeight + itemPool.getItems()[levelToStart].getWeight() <= maxWeight) {
-				upperBound += itemPool.getItems()[levelToStart].getPrice();
+				upperBound += (double) itemPool.getItems()[levelToStart].getPrice();
 				curWeight += itemPool.getItems()[levelToStart].getWeight();
 				levelToStart++;
 			}
 			else {
 				if (levelToStart < maxLevel) {
-					System.out.println("tu!");
-					upperBound += (maxWeight - curWeight) * 
-					(itemPool.getItems()[levelToStart].getPrice()
-							/itemPool.getItems()[levelToStart].getWeight());
+					//System.out.println("tu!");
+					upperBound += ((double)maxWeight - (double)curWeight) * 
+					((double)itemPool.getItems()[levelToStart].getPrice()
+							/(double)itemPool.getItems()[levelToStart].getWeight());
+					//System.out.println("ub: " + upperBound);
 				}
 				break;
 			}
